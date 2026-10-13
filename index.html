@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Study: Electrocardiography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --p:#0052cc; --p-dark:#003e9c; --ink:#0b2350; --muted:#4f6085;
+  --grid-s:#d7e4fb; --grid-b:#a9c3ef; --paper:#fbfcff; --wash:#eef3fc;
+  --line:#d3dcec; --bg:#f3f6fb;
+  --ok:#0f7a3d; --ok-bg:#e5f4eb; --bad:#b42318; --bad-bg:#fdeceb;
+  --sans:'Public Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --serif:'Source Serif 4',Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);font-size:16px;line-height:1.55}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #ffb020;outline-offset:2px}
+h2[tabindex="-1"]:focus{outline:none}
+
+.topbar{background:#fff;border-bottom:4px solid var(--p);display:flex;align-items:center;gap:16px;padding:12px 24px}
+.topbar img{height:52px;width:auto;display:block}
+.topbar .title{flex:1;min-width:0}
+.topbar h1{font-size:20px;margin:0;line-height:1.2;font-weight:700}
+.topbar .sub{font-size:13px;color:var(--muted);margin:2px 0 0}
+.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pill{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--wash);white-space:nowrap}
+.pill b{color:var(--p)}
+
+.stepper{background:#fff;border-bottom:1px solid var(--line);overflow-x:auto}
+.stepper ol{list-style:none;margin:0 auto;padding:0 16px;display:flex;max-width:1040px}
+.stepper li{flex:1 0 auto}
+.stepper button{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;border-bottom:3px solid transparent;padding:12px 10px;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.stepper button .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1.5px solid currentColor;font-size:12px;font-weight:600}
+.stepper button.current{color:var(--p);border-bottom-color:var(--p);font-weight:600}
+.stepper button.done{color:var(--ink)}
+.stepper button.done .n{background:var(--p);border-color:var(--p);color:#fff}
+.stepper button:disabled{cursor:not-allowed;opacity:.45}
+
+main{max-width:960px;margin:0 auto;padding:28px 20px 120px}
+.page{display:none}
+.page.active{display:block}
+.page > h2{font-size:30px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 20px;max-width:68ch}
+
+.block{background:#fff;border:1px solid var(--line);border-radius:8px;padding:22px 24px;margin:20px 0}
+.block > h3{font-size:19px;margin:0 0 4px}
+.block .kind{font-size:13px;font-weight:600;color:var(--p);margin:0 0 10px;display:flex;align-items:center;gap:6px}
+.block .kind::before{content:"";width:8px;height:8px;border-radius:2px;background:currentColor}
+
+/* Case file: ECG-paper backdrop is the signature element */
+.case{background-color:var(--paper);
+  background-image:linear-gradient(var(--grid-b) 1px,transparent 1px),linear-gradient(90deg,var(--grid-b) 1px,transparent 1px),linear-gradient(var(--grid-s) 1px,transparent 1px),linear-gradient(90deg,var(--grid-s) 1px,transparent 1px);
+  background-size:40px 40px,40px 40px,8px 8px,8px 8px;border-left:6px solid var(--p);position:relative}
+.case .sheet{background:rgba(255,255,255,.93);border-radius:6px;padding:18px 22px;font-family:var(--serif);font-size:17.5px;line-height:1.65;max-width:72ch}
+.case .sheet h4{font-family:var(--sans);font-size:17px;margin:0 0 8px;color:var(--p-dark)}
+.case .sheet p{margin:0 0 12px}
+.case .sheet ul{margin:0 0 12px;padding-left:22px}
+.case .sheet li{margin:4px 0}
+.case .sheet .q{margin:0 0 10px}
+.case-label{font-size:13px;font-weight:600;color:var(--p-dark);margin:0 0 10px;background:#fff;display:inline-block;padding:2px 10px;border-radius:4px;border:1px solid var(--grid-b)}
+
+.response textarea{width:100%;min-height:140px;border:1.5px solid var(--line);border-radius:6px;padding:12px 14px;resize:vertical;line-height:1.55;background:#fff}
+.response textarea:focus{border-color:var(--p);outline:none;box-shadow:0 0 0 3px rgba(0,82,204,.18)}
+.response .prompt{font-family:var(--serif);font-size:17px;margin:0 0 10px}
+.wc{font-size:13px;color:var(--muted);margin-top:6px}
+.wc.met{color:var(--ok);font-weight:600}
+.response + .response{margin-top:-8px}
+
+fieldset{border:0;margin:0;padding:0}
+legend{font-weight:600;margin-bottom:10px;padding:0;font-size:16.5px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:6px;padding:10px 12px;margin:8px 0;cursor:pointer;background:#fff}
+.opt:hover{border-color:var(--grid-b)}
+.opt input{margin-top:4px;accent-color:var(--p)}
+.opt.correct{border-color:var(--ok);background:var(--ok-bg)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.locked .opt{cursor:default}
+
+.btn{background:var(--p);color:#fff;border:0;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--p-dark)}
+.btn:disabled{background:#9db3d8;cursor:not-allowed}
+.btn.ghost{background:#fff;color:var(--p);border:1.5px solid var(--p)}
+.btn.ghost:hover{background:var(--wash)}
+.actions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.feedback{margin-top:14px;padding:12px 14px;border-radius:6px;font-size:15px}
+.feedback.ok{background:var(--ok-bg);border-left:4px solid var(--ok)}
+.feedback.bad{background:var(--bad-bg);border-left:4px solid var(--bad)}
+.feedback.info{background:var(--wash);border-left:4px solid var(--p)}
+.feedback strong{display:block;margin-bottom:2px}
+.note{font-size:13.5px;color:var(--muted)}
+
+/* Electrodes */
+.electro{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:22px;align-items:start}
+.electro svg{width:100%;max-width:440px;display:block;margin:0 auto;touch-action:none;background:var(--paper);border:1px solid var(--line);border-radius:8px}
+.tray{display:flex;flex-wrap:wrap;gap:8px;min-height:52px;padding:10px;border:1.5px dashed var(--grid-b);border-radius:8px;background:var(--wash)}
+.chip{width:46px;height:46px;border-radius:50%;border:2px solid var(--ink);font-weight:700;font-size:14px;cursor:grab;touch-action:none;user-select:none;display:grid;place-items:center}
+.chip.sel{outline:3px solid #ffb020;outline-offset:2px}
+.ghost-chip{position:fixed;pointer-events:none;z-index:50;transform:translate(-50%,-50%);box-shadow:0 6px 16px rgba(11,35,80,.3)}
+.zone{fill:#fff;stroke:var(--p);stroke-width:1.5;stroke-dasharray:3 2;cursor:pointer}
+.zone:hover{fill:#fff4d6}
+.side-lbl{font-size:11px;fill:var(--muted);font-weight:600;font-family:var(--sans)}
+.lm{font-size:8.5px;fill:var(--muted);font-family:var(--sans)}
+
+/* ECG */
+.ecg-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.ecg-scroll svg{display:block;min-width:760px;width:100%}
+.strip svg{min-width:560px}
+.lead-cell{fill:transparent;cursor:pointer}
+.lead-cell:hover{fill:rgba(0,82,204,.06)}
+.lead-cell.sel{fill:rgba(0,82,204,.12);stroke:var(--p);stroke-width:2.5}
+.lead-cell.good{fill:rgba(15,122,61,.12);stroke:var(--ok);stroke-width:2.5}
+.lead-cell.badsel{fill:rgba(180,35,24,.1);stroke:var(--bad);stroke-width:2.5}
+.lead-cell.missed{fill:transparent;stroke:var(--ok);stroke-width:2.5;stroke-dasharray:6 4}
+.lead-lbl{font:600 13px var(--sans);fill:var(--ink)}
+.trace{fill:none;stroke:#0b2350;stroke-width:1.6;stroke-linejoin:round}
+.tasks{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;padding:0;list-style:none}
+.tasks li{font-size:14px;padding:4px 12px;border-radius:999px;border:1.5px solid var(--line);background:#fff}
+.tasks li.now{border-color:var(--p);color:var(--p);font-weight:600}
+.tasks li.r-ok{border-color:var(--ok);background:var(--ok-bg)}
+.tasks li.r-bad{border-color:var(--bad);background:var(--bad-bg)}
+.task-prompt{font-weight:600;margin:0 0 10px}
+.caption{font-size:13px;color:var(--muted);margin:8px 0 0}
+
+/* Territory */
+.terr{display:grid;grid-template-columns:minmax(0,320px) 1fr;gap:22px;align-items:center}
+.wall{fill:#e8effc;stroke:#fff;stroke-width:3;cursor:pointer}
+.wall:hover{fill:#d7e4fb}
+.wall.sel{fill:var(--p)}
+.wall.good{fill:var(--ok)}
+.wall.badsel{fill:var(--bad)}
+.wall.missed{fill:#bfe3cc}
+.wall-lbl{font:600 13px var(--sans);fill:var(--ink);pointer-events:none}
+.wall-lbl.inv{fill:#fff}
+.wall-leads{font:500 11px var(--sans);fill:var(--ink);pointer-events:none}
+.wall-leads.inv{fill:#fff}
+
+/* Sort and match */
+.sort-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.sort-row:first-child{border-top:0}
+.seg{display:inline-flex;border:1.5px solid var(--p);border-radius:6px;overflow:hidden}
+.seg button{background:#fff;border:0;border-left:1.5px solid var(--p);padding:7px 12px;font-size:14px;cursor:pointer;color:var(--p);white-space:nowrap}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--p);color:#fff}
+.sort-row.r-ok .seg{border-color:var(--ok)}
+.sort-row.r-bad .seg{border-color:var(--bad)}
+.sort-row .ans{font-size:13px;color:var(--bad);grid-column:1/-1;margin-top:-4px}
+.match-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:14px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.match-row:first-child{border-top:0}
+.match-row select{width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:6px;background:#fff}
+.match-row.r-ok select{border-color:var(--ok);background:var(--ok-bg)}
+.match-row.r-bad select{border-color:var(--bad);background:var(--bad-bg)}
+.match-row .ans{grid-column:2;font-size:13px;color:var(--bad);margin-top:-6px}
+
+/* Instructions */
+.steps-list{counter-reset:s;list-style:none;padding:0;margin:0}
+.steps-list li{counter-increment:s;position:relative;padding:0 0 14px 44px}
+.steps-list li::before{content:counter(s);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;background:var(--p);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+.name-field label{font-weight:600;display:block;margin-bottom:6px}
+.name-field input{width:100%;max-width:420px;padding:10px 12px;border:1.5px solid var(--line);border-radius:6px}
+.name-field input:focus{border-color:var(--p);outline:none;box-shadow:0 0 0 3px rgba(0,82,204,.18)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+
+/* Report */
+.score-hero{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.score-num{font-size:64px;font-weight:700;line-height:1;color:var(--p);letter-spacing:-.02em}
+.score-meta p{margin:2px 0}
+table.breakdown{width:100%;border-collapse:collapse;font-size:15px}
+table.breakdown th,table.breakdown td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+table.breakdown th{font-size:13px;color:var(--muted);font-weight:600}
+table.breakdown td.r{text-align:right;font-variant-numeric:tabular-nums}
+.disc h4{margin:16px 0 6px;font-size:16px}
+.disc ol,.disc ul{margin:0;padding-left:22px}
+.disc li{margin:5px 0}
+
+/* Bottom nav */
+.bottom-nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:20}
+.bottom-nav .inner{max-width:960px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px}
+.bottom-nav .status{flex:1;font-size:13.5px;color:var(--muted);min-width:0}
+.bottom-nav .status.ready{color:var(--ok);font-weight:600}
+
+@media (max-width:760px){
+  .topbar{flex-wrap:wrap;padding:10px 16px}
+  .topbar img{height:42px}
+  .pills{width:100%;justify-content:flex-start}
+  .electro,.terr,.two-col{grid-template-columns:1fr}
+  .page > h2{font-size:25px}
+  .block{padding:18px 16px}
+  .case .sheet{padding:14px 14px;font-size:16.5px}
+  .sort-row{grid-template-columns:1fr}
+  .match-row{grid-template-columns:1fr}
+  .match-row .ans{grid-column:1}
+  .seg button{padding:7px 9px;font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="topbar">
+  <img src="data:image/jpeg;base64,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" alt="Florida Education Institute">
+  <div class="title">
+    <h1>Case Study: Electrocardiography</h1>
+    <p class="sub">Sarah Mitchell, 58 · Chest pain and shortness of breath</p>
+  </div>
+</header>
+
+<nav class="stepper" aria-label="Assignment sections"><ol id="stepper"></ol></nav>
+
+<main>
+
+<!-- PAGE 0: INSTRUCTIONS -->
+<section class="page" data-page="0" aria-labelledby="h0">
+  <h2 id="h0">How to complete this assignment</h2>
+  <p class="lede">You'll work through Sarah Mitchell's case the way a clinician would: from her presentation, to why an ECG is ordered, to performing and reading it, to deciding what comes next.</p>
+
+  <div class="block">
+    <h3>What you'll do</h3>
+    <ol class="steps-list">
+      <li><strong>Read each part of the case.</strong> Case text appears on the ECG-paper panel and is presented exactly as written.</li>
+      <li><strong>Complete the activities.</strong> Each section has hands-on tasks: placing electrodes, labeling an ECG tracing, mapping leads to the heart, sorting causes, and matching follow-up tests. Select Check to see whether you're right and why.</li>
+      <li><strong>Write your responses.</strong> Each written response needs at least 25 words. Sections unlock one at a time once the current section is complete.</li>
+      <li><strong>Download your PDF report.</strong> The final page builds a report, named with your name, containing every answer organized by section and question.</li>
+    </ol>
+  </div>
+
+  <div class="two-col">
+    <div class="block">
+      <h3>What goes in your report</h3>
+      <p>Your <strong>first answer</strong> on each activity is recorded and marked correct or incorrect, with the correct answer shown where you missed it.</p>
+      <p style="margin-bottom:0">Your written responses appear exactly as you wrote them and are not marked.</p>
+    </div>
+    <div class="block">
+      <h3>Before you start</h3>
+      <p>Your work is not saved if you close or refresh this page, so finish in one sitting and download your report before leaving.</p>
+      <p style="margin-bottom:0">Want another try? Select Start over on the final page. Activities reset with shuffled questions, and your written responses are kept.</p>
+    </div>
+  </div>
+
+  <div class="block name-field">
+    <label for="studentName">Your full name, as it should appear on your report</label>
+    <input id="studentName" type="text" autocomplete="name" placeholder="First and last name">
+    <p class="note" style="margin:8px 0 0">Plan for about 60–75 minutes. Then select Begin the case at the bottom of the page.</p>
+  </div>
+</section>
+
+<!-- PAGE 1: PRESENTATION -->
+<section class="page" data-page="1" aria-labelledby="h1">
+  <h2 id="h1">Patient presentation</h2>
+  <p class="lede">Meet Sarah. Read her history and vital signs, then identify what points her physician toward coronary artery disease.</p>
+
+  <div class="block case">
+    <span class="case-label">Case file</span>
+    <div class="sheet">
+      <h4>CASE STUDY - ELECTROCARDIOGRAPHY</h4>
+      <p>Sarah Mitchell, a 58-year-old woman, presents to her primary care physician with complaints of intermittent chest pain and shortness of breath over the past week. She describes the pain as a sharp discomfort in the center of her chest that comes on suddenly, particularly when she is walking briskly or climbing stairs. She mentions feeling fatigued more than usual and sometimes experiencing dizziness. Her medical history includes high blood pressure (hypertension) and a family history of heart disease. She is a non-smoker and maintains a relatively healthy diet.</p>
+      <p>Sarah’s vital signs at the clinic are:</p>
+      <ul>
+        <li>Blood pressure: 145/90 mmHg</li>
+        <li>Heart rate: 88 bpm</li>
+        <li>Respiratory rate: 18 breaths per minute</li>
+        <li>Temperature: 98.6°F</li>
+        <li>Oxygen saturation: 97%</li>
+      </ul>
+      <p style="margin-bottom:0">Given her symptoms and risk factors, her primary care physician suspects she may be at risk for coronary artery disease (CAD) and decides to order an electrocardiogram (ECG) to assess her heart’s electrical activity.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Spot the red flags</h3>
+    <div id="act-risk"></div>
+  </div>
+</section>
+
+<!-- PAGE 2: PURPOSE -->
+<section class="page" data-page="2" aria-labelledby="h2">
+  <h2 id="h2">Understand the purpose of electrocardiography</h2>
+  <p class="lede">Why start with an ECG? Check your understanding, then explain the rationale in your own words.</p>
+
+  <div class="block case">
+    <span class="case-label">Case file</span>
+    <div class="sheet">
+      <h4>1. Understand the Purpose of Electrocardiography</h4>
+      <p style="margin-bottom:0">Sarah's physician orders an ECG as a preliminary diagnostic tool to check for any signs of cardiac arrhythmias, ischemia, or other underlying heart conditions. Students should understand the rationale for ordering an ECG based on Sarah's symptoms and risk factors.</p>
+    </div>
+  </div>
+
+  <div class="block"><p class="kind">Scored activity</p><h3>Knowledge check 1</h3><div id="act-p2q1"></div></div>
+  <div class="block"><p class="kind">Scored activity</p><h3>Knowledge check 2</h3><div id="act-p2q2"></div></div>
+  <div class="block response" data-w="w2"></div>
+</section>
+
+<!-- PAGE 3: PROCEDURE -->
+<section class="page" data-page="3" aria-labelledby="h3">
+  <h2 id="h3">ECG procedure</h2>
+  <p class="lede">Prepare Sarah, place all ten electrodes for a 12-lead recording, and review what each wave and interval represents.</p>
+
+  <div class="block case">
+    <span class="case-label">Case file</span>
+    <div class="sheet">
+      <h4>2. ECG Procedure</h4>
+      <p>The students should describe the steps involved in performing an ECG:</p>
+      <ul style="margin-bottom:0">
+        <li>Preparation: Patient positioning (typically supine), ensuring proper electrode placement (chest, arms, and legs), and explaining the procedure to reduce patient anxiety.</li>
+        <li>Electrode placement: Correct placement of 12-lead electrodes to get a comprehensive view of the heart’s electrical activity.</li>
+        <li>Recording and Interpretation: Discussing the ECG machine setup and how to interpret the different waves (P, QRS, T) and intervals (PR, QT).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Place the 12-lead electrodes</h3>
+    <p style="margin-top:0">Sarah is lying supine. Drag each electrode onto its correct spot. On a touchscreen, tap an electrode and then tap a spot. Tap a placed electrode to return it to the tray.</p>
+    <div id="act-electrodes"></div>
+  </div>
+
+  <div class="block"><p class="kind">Scored activity</p><h3>Knowledge check 1</h3><div id="act-p3q1"></div></div>
+  <div class="block"><p class="kind">Scored activity</p><h3>Knowledge check 2</h3><div id="act-p3q2"></div></div>
+
+  <div class="block response" data-w="w3a"></div>
+  <div class="block response" data-w="w3b"></div>
+  <div class="block response" data-w="w3c"></div>
+</section>
+
+<!-- PAGE 4: INTERPRETATION -->
+<section class="page" data-page="4" aria-labelledby="h4">
+  <h2 id="h4">Interpretation of ECG findings</h2>
+  <p class="lede">Read Sarah's tracing: label the waves, find the abnormal leads, map them to the heart, and sort out what could cause each finding.</p>
+
+  <div class="block case">
+    <span class="case-label">Case file</span>
+    <div class="sheet">
+      <h4>3. Interpretation of ECG Findings</h4>
+      <p>Sarah’s ECG shows:</p>
+      <ul>
+        <li>Normal Sinus Rhythm with a heart rate of 88 bpm.</li>
+        <li>ST-segment depression in leads V4-V6.</li>
+        <li>T-wave inversion in the same leads (V4-V6).</li>
+        <li>Mild prolonged QT interval.</li>
+      </ul>
+      <p>Students should analyze these findings and explore:</p>
+      <ul style="margin-bottom:0">
+        <li>What could ST-segment depression and T-wave inversion indicate?</li>
+        <li>Why is QT prolongation concerning?</li>
+        <li>How do these findings relate to Sarah's reported chest pain and risk factors?</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>Sarah's 12-lead ECG</h3>
+    <div class="ecg-scroll" id="ecg12"></div>
+    <p class="caption">Illustrative tracing drawn for this case to match the findings above; not a recording from a real patient. Standard layout: 25 mm/s, 10 mm/mV.</p>
+  </div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Label the waves</h3>
+    <div id="act-trace"></div>
+  </div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Find the abnormal leads</h3>
+    <p style="margin-top:0">On the 12-lead ECG above, select every lead that shows ST-segment depression with T-wave inversion. Select a lead again to deselect it.</p>
+    <div id="act-leads"></div>
+  </div>
+
+  <div class="block"><p class="kind">Scored activity</p><h3>The prolonged interval</h3><div id="act-qt"></div></div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Map the leads to the heart</h3>
+    <div id="act-territory"></div>
+  </div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Sort the possible causes</h3>
+    <p style="margin-top:0">For each possible cause, choose which of Sarah's findings it is most characteristically associated with.</p>
+    <div id="act-sort"></div>
+  </div>
+
+  <div class="block response" data-w="w4a"></div>
+  <div class="block response" data-w="w4b"></div>
+  <div class="block response" data-w="w4c"></div>
+</section>
+
+<!-- PAGE 5: DIAGNOSTIC UNDERSTANDING & FOLLOW-UP -->
+<section class="page" data-page="5" aria-labelledby="h5">
+  <h2 id="h5">Diagnostic understanding and follow-up</h2>
+  <p class="lede">Pull the case together. Answer the diagnostic questions, decide which tests answer which clinical questions, and plan Sarah's next steps.</p>
+
+  <div class="block case">
+    <span class="case-label">Case file</span>
+    <div class="sheet"><h4 style="margin:0">Diagnostic Understanding:</h4></div>
+  </div>
+  <div class="block response" data-w="q1"></div>
+  <div class="block response" data-w="q2"></div>
+  <div class="block response" data-w="q3"></div>
+
+  <div class="block case">
+    <span class="case-label">Case file</span>
+    <div class="sheet"><h4 style="margin:0">Follow-Up and Further Tests:</h4></div>
+  </div>
+
+  <div class="block">
+    <p class="kind">Scored activity</p>
+    <h3>Which test answers which question?</h3>
+    <p style="margin-top:0">Match each test to the clinical question it is best suited to answer for Sarah.</p>
+    <div id="act-tests"></div>
+  </div>
+  <div class="block"><p class="kind">Scored activity</p><h3>Choosing a stress test</h3><div id="act-stressq"></div></div>
+
+  <div class="block response" data-w="q4"></div>
+  <div class="block response" data-w="q5"></div>
+</section>
+
+<!-- PAGE 6: REPORT -->
+<section class="page" data-page="6" aria-labelledby="h6">
+  <h2 id="h6">Case complete</h2>
+  <p class="lede">Download your report to keep your work. It includes every activity answer, marked correct or incorrect, followed by your written responses for each section.</p>
+  <div class="block">
+    <h3>Your PDF report</h3>
+    <p style="margin-top:0">The file is named with your name: <strong id="fileNamePreview"></strong></p>
+    <div class="actions">
+      <button class="btn" id="dlPdf">Download PDF report</button>
+      <button class="btn ghost" id="retake">Start over</button>
+    </div>
+    <p class="note" id="pdfMsg" style="margin:10px 0 0">Your work is not saved when you close this page, so download your report first.</p>
+  </div>
+</section>
+</main>
+
+<div class="bottom-nav">
+  <div class="inner">
+    <button class="btn ghost" id="backBtn">Back</button>
+    <div class="status" id="navStatus" aria-live="polite"></div>
+    <button class="btn" id="nextBtn">Continue</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- Config & state ---------------- */
+const MIN_WORDS = 25;
+const HR = 88, RR = 60/HR;
+const PAGES = ['Instructions','Presentation','Purpose','Procedure','Interpretation','Diagnosis & follow-up','Report'];
+const SECTION_TITLES = {1:'Section 1: Patient Presentation',2:'Section 2: Understand the Purpose of Electrocardiography',3:'Section 3: ECG Procedure',4:'Section 4: Interpretation of ECG Findings',5:'Section 5: Diagnostic Understanding and Follow-Up'};
+
+const REQ = {
+  1:{items:['risk'],written:[]},
+  2:{items:['p2q1','p2q2'],written:['w2']},
+  3:{items:['electrodes','p3q1','p3q2'],written:['w3a','w3b','w3c']},
+  4:{items:['trace','leads','qt','territory','sort'],written:['w4a','w4b','w4c']},
+  5:{items:['tests','stressq'],written:['q1','q2','q3','q4','q5']}
+};
+const ITEM_LABELS = {
+  risk:'Spot the red flags', p2q1:'Knowledge check 1', p2q2:'Knowledge check 2',
+  electrodes:'Electrode placement', p3q1:'Knowledge check 1', p3q2:'Knowledge check 2',
+  trace:'Label the waves', leads:'Find the abnormal leads', qt:'The prolonged interval',
+  territory:'Map the leads to the heart', sort:'Sort the possible causes',
+  tests:'Match tests to questions', stressq:'Choosing a stress test'
+};
+
+const WRITTEN = {
+  w2:{sec:2,title:'Your response: the rationale',prompt:'Based on Sarah\u2019s symptoms and risk factors, explain the rationale for ordering an ECG.'},
+  w3a:{sec:3,title:'Your response: preparation',prompt:'Describe the Preparation step: Patient positioning (typically supine), ensuring proper electrode placement (chest, arms, and legs), and explaining the procedure to reduce patient anxiety.'},
+  w3b:{sec:3,title:'Your response: electrode placement',prompt:'Describe the Electrode placement step: Correct placement of 12-lead electrodes to get a comprehensive view of the heart\u2019s electrical activity.'},
+  w3c:{sec:3,title:'Your response: recording and interpretation',prompt:'Describe the Recording and Interpretation step: Discussing the ECG machine setup and how to interpret the different waves (P, QRS, T) and intervals (PR, QT).'},
+  w4a:{sec:4,title:'Your response',prompt:'What could ST-segment depression and T-wave inversion indicate?'},
+  w4b:{sec:4,title:'Your response',prompt:'Why is QT prolongation concerning?'},
+  w4c:{sec:4,title:'Your response',prompt:'How do these findings relate to Sarah\'s reported chest pain and risk factors?'},
+  q1:{sec:5,title:'Question 1',prompt:'1. Why was an electrocardiogram (ECG) the first diagnostic tool chosen for Sarah? What role does ECG play in evaluating chest pain and shortness of breath?'},
+  q2:{sec:5,title:'Question 2',prompt:'2. What is the significance of ST-segment depression and T-wave inversion in Sarah\u2019s ECG? Which conditions could be indicated by these changes, and how do they correlate with her symptoms?'},
+  q3:{sec:5,title:'Question 3',prompt:'3. Discuss the potential implications of a prolonged QT interval. What underlying causes could lead to this, and what are the risks?'},
+  q4:{sec:5,title:'Question 4',prompt:'4. Given Sarah\u2019s symptoms and the findings from her ECG, what additional diagnostic tests might be necessary? Consider imaging studies (e.g., echocardiogram or coronary angiography) or functional tests (e.g., stress test).'},
+  q5:{sec:5,title:'Question 5',prompt:'5. What lifestyle modifications or medications might be recommended for Sarah to manage her hypertension and reduce her risk of heart disease?'}
+};
+
+const state = {page:0,maxUnlocked:0,name:'',written:{},scores:{},results:{}};
+
+
+/* ---------------- Helpers ---------------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+function shuffle(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function words(t){return (t||'').trim().split(/\s+/).filter(Boolean).length;}
+function setScore(id,earned,possible){state.scores[id]={earned,possible};updateNav();}
+function record(id,prompt,lines){state.results[id]={prompt,lines};}
+function feedback(cont,ok,title,body){const f=$('.feedback',cont);f.hidden=false;f.className='feedback '+(ok===null?'info':ok?'ok':'bad');f.innerHTML=(title?'<strong>'+title+'</strong>':'')+body;}
+
+/* ---------------- Multiple choice ---------------- */
+const MCQ = {
+  p2q1:{prompt:'Which statement best explains why an ECG is an appropriate first test for Sarah?',options:[
+    {t:'It is quick, noninvasive, inexpensive, and can immediately reveal arrhythmias or signs of ischemia.',c:1},
+    {t:'It directly visualizes the coronary arteries to locate blockages.'},
+    {t:'It measures the heart\u2019s ejection fraction and valve function.'},
+    {t:'It is only useful after a heart attack has been confirmed by blood tests.'}],
+    explain:'An ECG is fast, noninvasive, inexpensive, and available in the clinic. It can show arrhythmias, signs of ischemia or prior infarction, and conduction or repolarization abnormalities, which makes it the standard first test for chest pain and shortness of breath. Coronary angiography visualizes the arteries; echocardiography assesses structure and pumping function.'},
+  p2q2:{prompt:'Sarah\u2019s chest pain comes on when she walks briskly or climbs stairs. Why does this pattern matter?',options:[
+    {t:'Pain with exertion suggests the heart\u2019s oxygen demand is exceeding its supply, a classic feature of ischemia from CAD.',c:1},
+    {t:'Pain with exertion rules out a cardiac cause, because cardiac pain only occurs at rest.'},
+    {t:'Pain with exertion points to a respiratory infection, given her respiratory rate.'},
+    {t:'Pain with exertion indicates a musculoskeletal strain from the activity itself.'}],
+    explain:'Pain that appears with exertion is the classic pattern of angina: narrowed coronary arteries can\u2019t increase blood flow enough to meet the heart\u2019s higher oxygen demand.'},
+  p3q1:{prompt:'On a standard ECG, the QRS complex represents:',options:[
+    {t:'Ventricular depolarization',c:1},{t:'Atrial depolarization'},{t:'Ventricular repolarization'},{t:'The impulse delay at the AV node'}],
+    explain:'The P wave is atrial depolarization, the QRS complex is ventricular depolarization (atrial repolarization is hidden within it), and the T wave is ventricular repolarization.'},
+  p3q2:{prompt:'The PR interval measures:',options:[
+    {t:'The time from the start of atrial depolarization to the start of ventricular depolarization (normally 0.12\u20130.20 s)',c:1},
+    {t:'The total time for ventricular depolarization and repolarization'},
+    {t:'The duration of ventricular depolarization only (normally under 0.12 s)'},
+    {t:'The time between two consecutive R waves'}],
+    explain:'The PR interval runs from the beginning of the P wave to the beginning of the QRS complex, normally 0.12\u20130.20 seconds. QRS duration is normally under 0.12 s, the QT interval covers ventricular depolarization plus repolarization, and the R-to-R interval reflects heart rate.'},
+  qt:{prompt:'Sarah\u2019s ECG shows a mildly prolonged interval. Which interval spans ventricular depolarization and repolarization, from the start of the QRS complex to the end of the T wave?',options:[
+    {t:'QT interval',c:1},{t:'PR interval'},{t:'QRS duration'},{t:'R-to-R interval'}],
+    explain:'The QT interval runs from the start of the QRS complex to the end of the T wave. Because QT shortens as heart rate rises, it is corrected for rate (QTc, for example with Bazett\u2019s formula). In women, a QTc above about 460 ms is generally considered prolonged, and values above 500 ms carry a substantially higher risk of torsades de pointes.'},
+  stressq:{prompt:'Why is a stress test with imaging (stress echocardiogram or nuclear perfusion) often preferred over a standard exercise ECG for a patient like Sarah?',options:[
+    {t:'Her resting ECG already shows ST depression, which makes new exercise-induced ST changes hard to interpret.',c:1},
+    {t:'Exercise ECGs cannot detect ischemia in women.'},
+    {t:'Imaging stress tests never involve physical exertion, so they are always safer.'},
+    {t:'A standard exercise ECG requires a normal oxygen saturation, and hers is too low.'}],
+    explain:'When the resting ECG already shows ST-segment depression, additional ST changes during exercise are difficult to interpret. Adding imaging lets the clinician look directly for exercise- or medication-induced wall-motion or perfusion abnormalities.'}
+};
+
+function renderMCQ(id){
+  const q=MCQ[id], cont=$('#act-'+id);
+  const opts=shuffle(q.options.map((o,i)=>({...o,i})));
+  cont.innerHTML='<fieldset><legend>'+esc(q.prompt)+'</legend>'+opts.map(o=>
+    '<label class="opt" data-i="'+o.i+'"><input type="radio" name="r-'+id+'" value="'+o.i+'"><span>'+esc(o.t)+'</span></label>').join('')+
+    '</fieldset><div class="actions"><button class="btn" data-check>Check answer</button></div><div class="feedback" hidden></div>';
+  $('[data-check]',cont).addEventListener('click',()=>{
+    const sel=$('input:checked',cont);
+    if(!sel){feedback(cont,null,'','Select an answer first.');return;}
+    const i=+sel.value, ok=!!q.options[i].c;
+    setScore(id,ok?1:0,1);
+    record(id,q.prompt,[{ok,text:'Your answer: '+q.options[i].t,fix:ok?null:'Correct answer: '+q.options.find(o=>o.c).t}]);
+    cont.classList.add('locked');
+    $$('input',cont).forEach(x=>x.disabled=true);
+    $$('.opt',cont).forEach(l=>{const li=+l.dataset.i;if(q.options[li].c)l.classList.add('correct');else if(li===i)l.classList.add('wrong');});
+    $('[data-check]',cont).disabled=true;
+    feedback(cont,ok,ok?'Correct.':'Not quite.',esc(q.explain));
+  });
+}
+
+/* ---------------- Risk factors (multi-select) ---------------- */
+const RISK = [
+  {t:'Age 58',c:1},{t:'History of hypertension (145/90 mmHg at this visit)',c:1},{t:'Family history of heart disease',c:1},
+  {t:'Chest pain and shortness of breath brought on by exertion',c:1},
+  {t:'Smoking history'},{t:'Fever'},{t:'Low oxygen saturation'}
+];
+function renderRisk(){
+  const cont=$('#act-risk'); const opts=shuffle(RISK.map((o,i)=>({...o,i})));
+  cont.innerHTML='<fieldset><legend>Select every finding from Sarah\u2019s presentation that supports her physician\u2019s suspicion of coronary artery disease.</legend>'+
+    opts.map(o=>'<label class="opt" data-i="'+o.i+'"><input type="checkbox" value="'+o.i+'"><span>'+esc(o.t)+'</span></label>').join('')+
+    '</fieldset><div class="actions"><button class="btn" data-check>Check answer</button></div><div class="feedback" hidden></div>';
+  $('[data-check]',cont).addEventListener('click',()=>{
+    const sel=$$('input:checked',cont).map(x=>+x.value);
+    if(!sel.length){feedback(cont,null,'','Select at least one finding first.');return;}
+    const right=sel.filter(i=>RISK[i].c).length, wrong=sel.length-right;
+    const earned=Math.max(0,right-wrong); setScore('risk',earned,4);
+    const rl=[];RISK.forEach((o,i)=>{const on=sel.includes(i);
+      if(on)rl.push({ok:!!o.c,text:'Selected: '+o.t,fix:o.c?null:'This does not support CAD in Sarah\u2019s case.'});
+      else if(o.c)rl.push({ok:false,text:'Not selected: '+o.t,fix:'This finding supports the suspicion of CAD.'});});
+    record('risk','Select every finding from Sarah\u2019s presentation that supports her physician\u2019s suspicion of coronary artery disease.',rl);
+    cont.classList.add('locked'); $$('input',cont).forEach(x=>x.disabled=true); $('[data-check]',cont).disabled=true;
+    $$('.opt',cont).forEach(l=>{const i=+l.dataset.i;if(RISK[i].c)l.classList.add('correct');else if(sel.includes(i))l.classList.add('wrong');});
+    feedback(cont,right===4&&wrong===0,right===4&&wrong===0?'Correct.':'Not quite.','Sarah\u2019s age, hypertension, family history, and exertional chest pain with shortness of breath all raise suspicion for CAD. She is a non-smoker, she is afebrile (98.6\u00B0F), and her oxygen saturation (97%) is normal, so those findings don\u2019t add to her CAD risk. Correct choices are outlined in green; incorrect selections in red.');
+  });
+}
+
+/* ---------------- Electrode placement ---------------- */
+const ELECTRODES = [
+  {id:'RA',fill:'#ffffff',fg:'#0b2350',x:70,y:312,where:'right arm, on the wrist or forearm'},
+  {id:'LA',fill:'#1d1d1d',fg:'#ffffff',x:330,y:312,where:'left arm, on the wrist or forearm'},
+  {id:'RL',fill:'#2e9b4f',fg:'#ffffff',x:162,y:470,where:'right leg, on the ankle or lower leg (ground)'},
+  {id:'LL',fill:'#d63a2f',fg:'#ffffff',x:238,y:470,where:'left leg, on the ankle or lower leg'},
+  {id:'V1',fill:'#d63a2f',fg:'#ffffff',x:186,y:190,where:'4th intercostal space, right sternal border'},
+  {id:'V2',fill:'#f3c623',fg:'#0b2350',x:214,y:190,where:'4th intercostal space, left sternal border'},
+  {id:'V3',fill:'#2e9b4f',fg:'#ffffff',x:229,y:207,where:'midway between V2 and V4'},
+  {id:'V4',fill:'#2f6fd6',fg:'#ffffff',x:244,y:224,where:'5th intercostal space, left midclavicular line'},
+  {id:'V5',fill:'#ef8a22',fg:'#0b2350',x:266,y:224,where:'left anterior axillary line, level with V4'},
+  {id:'V6',fill:'#7b45b8',fg:'#ffffff',x:290,y:224,where:'left midaxillary line, level with V4'}
+];
+const EL = Object.fromEntries(ELECTRODES.map(e=>[e.id,e]));
+const BODY_SVG = `
+<text x="16" y="24" class="side-lbl">Patient's right</text>
+<text x="384" y="24" text-anchor="end" class="side-lbl">Patient's left</text>
+<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="112,128 86,200 72,300" stroke="#a9bbdc" stroke-width="33"/>
+  <polyline points="288,128 314,200 328,300" stroke="#a9bbdc" stroke-width="33"/>
+  <polyline points="168,330 162,488" stroke="#a9bbdc" stroke-width="43"/>
+  <polyline points="232,330 238,488" stroke="#a9bbdc" stroke-width="43"/>
+  <polyline points="112,128 86,200 72,300" stroke="#e6ecf7" stroke-width="29"/>
+  <polyline points="288,128 314,200 328,300" stroke="#e6ecf7" stroke-width="29"/>
+  <polyline points="168,330 162,488" stroke="#e6ecf7" stroke-width="39"/>
+  <polyline points="232,330 238,488" stroke="#e6ecf7" stroke-width="39"/>
+</g>
+<g fill="#e6ecf7" stroke="#a9bbdc" stroke-width="2">
+  <circle cx="70" cy="314" r="15"/><circle cx="330" cy="314" r="15"/>
+  <ellipse cx="158" cy="500" rx="22" ry="10"/><ellipse cx="242" cy="500" rx="22" ry="10"/>
+  <rect x="186" y="74" width="28" height="36"/>
+  <path d="M150,104 L250,104 Q296,110 300,150 L292,330 Q200,348 108,330 L100,150 Q104,110 150,104 Z"/>
+  <circle cx="200" cy="50" r="30"/>
+</g>
+<g stroke="#9fb3d9" stroke-width="1.2" fill="none">
+  <path d="M152,116 Q176,110 197,120"/><path d="M203,120 Q224,110 248,116"/>
+  <line x1="200" y1="122" x2="200" y2="236" stroke-width="2.5"/>
+  <path d="M112,173 Q200,183 288,173"/><path d="M112,207 Q200,217 288,207"/><path d="M112,241 Q200,251 288,241"/>
+  <g stroke-dasharray="4 3" stroke="#7d99cf"><line x1="244" y1="128" x2="244" y2="300"/><line x1="266" y1="128" x2="266" y2="300"/><line x1="290" y1="128" x2="290" y2="300"/></g>
+</g>
+<text x="244" y="124" text-anchor="middle" class="lm">MCL</text>
+<text x="266" y="124" text-anchor="middle" class="lm">AAL</text>
+<text x="290" y="124" text-anchor="middle" class="lm">MAL</text>
+<text x="106" y="193" class="lm">4th ICS</text>
+<text x="106" y="227" class="lm">5th ICS</text>`;
+
+function renderElectrodes(){
+  const cont=$('#act-electrodes');
+  let placement={}, selected=null, locked=false;
+  const order=shuffle(ELECTRODES.map(e=>e.id));
+  cont.innerHTML='<div class="electro"><div><svg viewBox="0 0 400 520" role="img" aria-label="Front view of a supine patient with electrode positions">'+BODY_SVG+'<g class="zones"></g><g class="placed"></g><g class="marks"></g></svg>'+
+    '<p class="caption">MCL: midclavicular line · AAL: anterior axillary line · MAL: midaxillary line · ICS: intercostal space</p></div>'+
+    '<div><p style="margin:0 0 8px;font-weight:600">Electrodes</p><div class="tray" aria-label="Electrode tray"></div>'+
+    '<p class="note">Colors follow the AHA convention used on most US lead sets.</p>'+
+    '<div class="actions"><button class="btn" data-check>Check placement</button><button class="btn ghost" data-clear>Clear all</button></div><div class="feedback" hidden></div></div></div>';
+  const svg=$('svg',cont), tray=$('.tray',cont), gZones=$('.zones',svg), gPlaced=$('.placed',svg), gMarks=$('.marks',svg);
+  const NS='http://www.w3.org/2000/svg';
+
+  gZones.innerHTML=ELECTRODES.map(e=>'<circle class="zone" data-zone="'+e.id+'" cx="'+e.x+'" cy="'+e.y+'" r="10"><title>Electrode spot</title></circle>').join('');
+
+  function draw(){
+    const placedIds=Object.values(placement);
+    tray.innerHTML=order.filter(id=>!placedIds.includes(id)).map(id=>{const e=EL[id];
+      return '<button type="button" class="chip'+(selected===id?' sel':'')+'" data-chip="'+id+'" style="background:'+e.fill+';color:'+e.fg+'" aria-label="Electrode '+id+'">'+id+'</button>';}).join('')||'<span class="note">All electrodes placed.</span>';
+    gPlaced.innerHTML=Object.entries(placement).map(([z,id])=>{const p=EL[z],e=EL[id];
+      return '<g data-placed="'+z+'" style="cursor:pointer"><circle cx="'+p.x+'" cy="'+p.y+'" r="11" fill="'+e.fill+'" stroke="#0b2350" stroke-width="1.6"/><text x="'+p.x+'" y="'+(p.y+3.5)+'" text-anchor="middle" font-size="9.5" font-weight="700" font-family="Public Sans,Arial,sans-serif" fill="'+e.fg+'" pointer-events="none">'+id+'</text></g>';}).join('');
+  }
+  function place(id,zone){
+    for(const z in placement){if(placement[z]===id)delete placement[z];}
+    placement[zone]=id; selected=null; draw();
+  }
+  function toSvg(cx,cy){const pt=svg.createSVGPoint();pt.x=cx;pt.y=cy;return pt.matrixTransform(svg.getScreenCTM().inverse());}
+  function nearestZone(p){let best=null,bd=24;ELECTRODES.forEach(e=>{const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<bd){bd=d;best=e.id;}});return best;}
+
+  tray.addEventListener('pointerdown',ev=>{
+    const chip=ev.target.closest('[data-chip]'); if(!chip||locked)return;
+    ev.preventDefault();
+    const id=chip.dataset.chip, sx=ev.clientX, sy=ev.clientY; let ghost=null;
+    const move=e=>{
+      if(!ghost && Math.hypot(e.clientX-sx,e.clientY-sy)>6){ghost=chip.cloneNode(true);ghost.classList.add('ghost-chip');ghost.classList.remove('sel');document.body.appendChild(ghost);chip.style.opacity='.35';}
+      if(ghost){ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';}
+    };
+    const up=e=>{
+      document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);document.removeEventListener('pointercancel',up);
+      if(ghost){ghost.remove();chip.style.opacity='';
+        const r=svg.getBoundingClientRect();
+        if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){const z=nearestZone(toSvg(e.clientX,e.clientY));if(z){place(id,z);return;}}
+        draw();
+      } else { selected=(selected===id)?null:id; draw(); }
+    };
+    document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up);
+  });
+  tray.addEventListener('keydown',ev=>{const chip=ev.target.closest('[data-chip]');if(chip&&(ev.key==='Enter'||ev.key===' ')){ev.preventDefault();selected=chip.dataset.chip;draw();}});
+  svg.addEventListener('click',ev=>{
+    if(locked)return;
+    const pg=ev.target.closest('[data-placed]'), zn=ev.target.closest('[data-zone]');
+    const zone=pg?pg.dataset.placed:zn?zn.dataset.zone:null; if(!zone)return;
+    if(selected){place(selected,zone);}
+    else if(pg){delete placement[zone];draw();}
+  });
+  $('[data-clear]',cont).addEventListener('click',()=>{if(locked)return;placement={};selected=null;draw();});
+  $('[data-check]',cont).addEventListener('click',()=>{
+    if(Object.keys(placement).length<10){feedback(cont,null,'',(10-Object.keys(placement).length)+' electrode(s) still in the tray. Place all 10 before checking.');return;}
+    locked=true;
+    let earned=0; let marks='';
+    ELECTRODES.forEach(e=>{const ok=placement[e.id]===e.id;if(ok)earned++;
+      marks+='<circle cx="'+e.x+'" cy="'+e.y+'" r="14" fill="none" stroke="'+(ok?'#0f7a3d':'#b42318')+'" stroke-width="2.5"/>';
+      if(!ok)marks+='<text x="'+e.x+'" y="'+(e.y-17)+'" text-anchor="middle" font-size="9" font-weight="700" fill="#b42318" font-family="Public Sans,Arial,sans-serif">'+e.id+'</text>';});
+    gMarks.innerHTML=marks;
+    setScore('electrodes',earned,10);
+    record('electrodes','Place the 12-lead electrodes on a supine patient.',ELECTRODES.map(e=>{const z=Object.keys(placement).find(k=>placement[k]===e.id);const ok=z===e.id;
+      return {ok,text:e.id+' placed at: '+EL[z].where,fix:ok?null:'Correct location: '+e.where};}));
+    $('[data-check]',cont).disabled=true;$('[data-clear]',cont).disabled=true;
+    feedback(cont,earned===10,earned+' of 10 electrodes placed correctly.',
+      (earned<10?'Red rings show misplaced electrodes, labeled with the electrode that belongs there.<br>':'')+
+      '<ul style="margin:8px 0 0;padding-left:20px">'+ELECTRODES.map(e=>'<li><b>'+e.id+'</b>: '+esc(e.where)+'</li>').join('')+'</ul>'+
+      '<p style="margin:8px 0 0">Ten electrodes produce 12 leads: six limb leads (I, II, III, aVR, aVL, aVF) and six precordial leads (V1\u2013V6).</p>');
+  });
+  draw();
+}
+
+/* ---------------- ECG drawing ---------------- */
+const LEADP = {
+  I:{p:.10,q:-.05,r:.80,s:-.10,t:.25}, II:{p:.15,q:-.05,r:1.20,s:-.15,t:.30}, III:{p:.06,q:-.03,r:.50,s:-.10,t:.10},
+  aVR:{p:-.12,q:.05,r:-.95,s:.12,t:-.25}, aVL:{p:.05,q:-.03,r:.45,s:-.05,t:.12}, aVF:{p:.10,q:-.04,r:.85,s:-.12,t:.20},
+  V1:{p:.08,q:0,r:.25,s:-.95,t:.10}, V2:{p:.08,q:0,r:.45,s:-1.2,t:.35}, V3:{p:.08,q:-.03,r:.85,s:-.65,t:.35},
+  V4:{p:.10,q:-.06,r:1.35,s:-.30,t:-.28,st:-.17}, V5:{p:.10,q:-.08,r:1.25,s:-.15,t:-.25,st:-.15}, V6:{p:.10,q:-.07,r:1.00,s:-.08,t:-.20,st:-.12}
+};
+function ecgV(t,L){
+  const ph=((t%RR)+RR)%RR;
+  const g=(c,w)=>Math.exp(-((ph-c)*(ph-c))/(2*w*w));
+  let v=L.p*g(.10,.022)+L.q*g(.205,.007)+L.r*g(.225,.009)+L.s*g(.245,.009)+L.t*g(.47,.045);
+  if(L.st){const sg=x=>1/(1+Math.exp(-x));v+=L.st*sg((ph-.262)/.006)*sg((.42-ph)/.03);}
+  return v;
+}
+function tracePath(L,t0,t1,x0,base,pps,mv){
+  let d='';for(let t=t0;t<=t1+1e-9;t+=.003){const x=x0+(t-t0)*pps,y=base-ecgV(t,L)*mv;d+=(d?'L':'M')+x.toFixed(1)+','+y.toFixed(1);}return d;
+}
+function gridDefs(id,small){
+  return '<defs><pattern id="'+id+'s" width="'+small+'" height="'+small+'" patternUnits="userSpaceOnUse"><path d="M'+small+',0 L0,0 0,'+small+'" fill="none" stroke="#d7e4fb" stroke-width=".7"/></pattern>'+
+    '<pattern id="'+id+'" width="'+small*5+'" height="'+small*5+'" patternUnits="userSpaceOnUse"><rect width="'+small*5+'" height="'+small*5+'" fill="url(#'+id+'s)"/><path d="M'+small*5+',0 L0,0 0,'+small*5+'" fill="none" stroke="#a9c3ef" stroke-width="1"/></pattern></defs>';
+}
+const LAYOUT=[['I','aVR','V1','V4'],['II','aVL','V2','V5'],['III','aVF','V3','V6']];
+function draw12(){
+  const W=1000,RH=130,H=RH*3, pps=100, mv=40;
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="12-lead ECG. Select leads for the abnormal-leads activity.">'+gridDefs('g12',4)+'<rect width="'+W+'" height="'+H+'" fill="url(#g12)"/>';
+  LAYOUT.forEach((row,r)=>row.forEach((lead,c)=>{
+    const x0=c*250, base=r*RH+78;
+    s+='<path class="trace" d="'+tracePath(LEADP[lead],c*2.5,c*2.5+2.5,x0,base,pps,mv)+'"/>';
+    s+='<text class="lead-lbl" x="'+(x0+8)+'" y="'+(r*RH+20)+'">'+lead+'</text>';
+    if(c>0)s+='<line x1="'+x0+'" y1="'+(base-14)+'" x2="'+x0+'" y2="'+(base+14)+'" stroke="#0b2350" stroke-width="1.4"/>';
+    s+='<rect class="lead-cell" data-lead="'+lead+'" x="'+(x0+2)+'" y="'+(r*RH+2)+'" width="246" height="'+(RH-4)+'" rx="4" tabindex="0" role="button" aria-label="Lead '+lead+'"><title>Lead '+lead+'</title></rect>';
+  }));
+  s+='</svg>'; $('#ecg12').innerHTML=s;
+}
+
+/* Label the waves */
+const REGIONS={P:[.045,.16],QRS:[.185,.27],T:[.37,.60]};
+const REGION_NAMES={P:'P wave',QRS:'QRS complex',T:'T wave'};
+function regionAt(ph){
+  for(const k in REGIONS){const [a,b]=REGIONS[k];if(ph>=a&&ph<=b)return k;}
+  if(ph>.16&&ph<.185)return 'PR segment'; if(ph>.27&&ph<.37)return 'ST segment'; return 'baseline between beats';
+}
+function renderTrace(){
+  const cont=$('#act-trace');
+  const tasks=['P','QRS','T'], prompts={P:'Click the P wave (atrial depolarization) on any beat.',QRS:'Click the QRS complex (ventricular depolarization) on any beat.',T:'Click the T wave (ventricular repolarization) on any beat.'};
+  let step=0, earned=0, results=[], hits=[];
+  const W=600,H=210,pps=200,mv=80,base=130;
+  cont.innerHTML='<ul class="tasks"></ul><p class="task-prompt"></p><div class="ecg-scroll strip"><svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Enlarged lead II rhythm strip" style="cursor:crosshair">'+gridDefs('gII',8)+
+    '<rect width="'+W+'" height="'+H+'" fill="url(#gII)"/><g class="bands"></g><path class="trace" style="stroke-width:2.2" d="'+tracePath(LEADP.II,0,3,0,base,pps,mv)+'"/><text class="lead-lbl" x="10" y="22">II (enlarged)</text><g class="dots"></g></svg></div>'+
+    '<p class="caption">Lead II, enlarged. Your first click for each wave is scored.</p><div class="feedback" hidden></div>';
+  const svg=$('svg',cont), bands=$('.bands',svg), dots=$('.dots',svg);
+  function ui(){
+    $('.tasks',cont).innerHTML=tasks.map((t,i)=>'<li class="'+(results[i]===true?'r-ok':results[i]===false?'r-bad':i===step?'now':'')+'">'+(i+1)+'. '+REGION_NAMES[t]+'</li>').join('');
+    $('.task-prompt',cont).textContent=step<3?prompts[tasks[step]]:'All three waves labeled.';
+  }
+  svg.addEventListener('click',ev=>{
+    if(step>=3)return;
+    const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;const p=pt.matrixTransform(svg.getScreenCTM().inverse());
+    const t=p.x/pps, bi=Math.floor(t/RR), ph=t-bi*RR, target=tasks[step], hit=regionAt(ph), ok=hit===target;
+    const [a,b]=REGIONS[target];
+    bands.innerHTML+='<rect x="'+((bi*RR+a)*pps)+'" y="30" width="'+((b-a)*pps)+'" height="170" fill="'+(ok?'rgba(15,122,61,.18)':'rgba(255,176,32,.28)')+'" stroke="'+(ok?'#0f7a3d':'#c27c00')+'" stroke-dasharray="4 3"/>'+
+      '<text x="'+((bi*RR+(a+b)/2)*pps)+'" y="46" text-anchor="middle" font-size="12" font-weight="700" fill="'+(ok?'#0f7a3d':'#8a5a00')+'" font-family="Public Sans,Arial,sans-serif">'+target+'</text>';
+    dots.innerHTML+='<circle cx="'+p.x+'" cy="'+p.y+'" r="5" fill="'+(ok?'#0f7a3d':'#b42318')+'" stroke="#fff" stroke-width="1.5"/>';
+    results[step]=ok; hits[step]=hit; if(ok)earned++;
+    feedback(cont,ok,ok?'Correct: that\u2019s the '+REGION_NAMES[target]+'.':'That spot is the '+(REGION_NAMES[hit]||hit)+'.',ok?'':'The '+REGION_NAMES[target]+' is highlighted on that beat.');
+    step++; ui();
+    if(step===3){setScore('trace',earned,3);
+      record('trace','On an enlarged lead II strip, click the P wave, QRS complex, and T wave.',tasks.map((k,i)=>({ok:results[i],text:REGION_NAMES[k]+': you clicked the '+(REGION_NAMES[hits[i]]||hits[i]),fix:results[i]?null:'The '+REGION_NAMES[k]+' was highlighted on that beat.'})));
+      setTimeout(()=>feedback(cont,earned===3,earned+' of 3 waves labeled correctly.','The PR interval spans from the start of the P wave to the start of the QRS. The QT interval spans from the start of the QRS to the end of the T wave; in Sarah\u2019s tracing, the T wave ends late relative to her heart rate, which is what \u201Cmildly prolonged QT\u201D means.'),900);}
+  });
+  ui();
+}
+
+/* Find the abnormal leads */
+function renderLeads(){
+  const cont=$('#act-leads'); let sel=new Set(), locked=false;
+  const ANS=['V4','V5','V6'];
+  cont.innerHTML='<p class="note" style="margin:0">Selected: <span class="sel-list">none</span></p><div class="actions"><button class="btn" data-check>Check leads</button></div><div class="feedback" hidden></div>';
+  const cells=$$('#ecg12 .lead-cell');
+  cells.forEach(c=>c.classList.remove('sel','good','badsel','missed'));
+  function toggle(c){if(locked)return;const l=c.dataset.lead;sel.has(l)?sel.delete(l):sel.add(l);c.classList.toggle('sel');$('.sel-list',cont).textContent=sel.size?Array.from(sel).join(', '):'none';}
+  cells.forEach(c=>{c.onclick=()=>toggle(c);c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle(c);}};});
+  $('[data-check]',cont).addEventListener('click',()=>{
+    if(!sel.size){feedback(cont,null,'','Select at least one lead on the tracing first.');return;}
+    locked=true; const right=[...sel].filter(l=>ANS.includes(l)).length, wrong=sel.size-right, earned=Math.max(0,right-wrong);
+    setScore('leads',earned,3); $('[data-check]',cont).disabled=true;
+    const order=LAYOUT[0].map((_,c)=>LAYOUT.map(r=>r[c])).flat(), ll=[];
+    order.forEach(l=>{if(sel.has(l))ll.push({ok:ANS.includes(l),text:'Selected lead '+l,fix:ANS.includes(l)?null:'Lead '+l+' does not show these changes.'});
+      else if(ANS.includes(l))ll.push({ok:false,text:'Not selected: lead '+l,fix:'Lead '+l+' shows ST-segment depression with T-wave inversion.'});});
+    record('leads','Select every lead that shows ST-segment depression with T-wave inversion.',ll);
+    cells.forEach(c=>{const l=c.dataset.lead;c.classList.remove('sel');if(ANS.includes(l))c.classList.add(sel.has(l)?'good':'missed');else if(sel.has(l))c.classList.add('badsel');});
+    feedback(cont,right===3&&wrong===0,right===3&&wrong===0?'Correct.':'Not quite.','ST-segment depression and T-wave inversion appear in V4, V5, and V6 (outlined in green). These leads view the anterior and lateral walls of the left ventricle.');
+  });
+}
+
+/* Territory map */
+const WALLS=[
+  {id:'anterior',name:'Anterior',a0:-135,a1:-45,leads:'V3\u2013V4'},
+  {id:'lateral',name:'Lateral',a0:-45,a1:45,leads:'I, aVL, V5\u2013V6'},
+  {id:'inferior',name:'Inferior',a0:45,a1:135,leads:'II, III, aVF'},
+  {id:'septal',name:'Septal',a0:135,a1:225,leads:'V1\u2013V2'}
+];
+function arc(cx,cy,ro,ri,a0,a1){const k=Math.PI/180,p=(R,a)=>(cx+R*Math.cos(a*k)).toFixed(1)+','+(cy+R*Math.sin(a*k)).toFixed(1);
+  return 'M'+p(ro,a0)+' A'+ro+','+ro+' 0 0 1 '+p(ro,a1)+' L'+p(ri,a1)+' A'+ri+','+ri+' 0 0 0 '+p(ri,a0)+' Z';}
+function renderTerritory(){
+  const cont=$('#act-territory'); let sel=new Set(), locked=false; const ANS=['anterior','lateral'];
+  const cx=160,cy=160,ro=140,ri=62;
+  let svg='<svg viewBox="0 0 320 320" role="group" aria-label="Schematic cross-section of the left ventricle">';
+  WALLS.forEach(w=>{const m=(w.a0+w.a1)/2*Math.PI/180, lx=cx+101*Math.cos(m), ly=cy+101*Math.sin(m);
+    svg+='<path class="wall" data-wall="'+w.id+'" d="'+arc(cx,cy,ro,ri,w.a0,w.a1)+'" tabindex="0" role="button" aria-label="'+w.name+' wall"/>'+
+      '<text class="wall-lbl" data-l="'+w.id+'" x="'+lx.toFixed(1)+'" y="'+(ly+4).toFixed(1)+'" text-anchor="middle">'+w.name+'</text>'+
+      '<text class="wall-leads" data-ll="'+w.id+'" x="'+lx.toFixed(1)+'" y="'+(ly+20).toFixed(1)+'" text-anchor="middle"></text>';});
+  svg+='<text x="160" y="158" text-anchor="middle" font-size="11" fill="#4f6085" font-family="Public Sans,Arial,sans-serif">Left</text><text x="160" y="172" text-anchor="middle" font-size="11" fill="#4f6085" font-family="Public Sans,Arial,sans-serif">ventricle</text></svg>';
+  cont.innerHTML='<div class="terr"><div>'+svg+'<p class="caption" style="text-align:center">Schematic cross-section of the left ventricle</p></div><div>'+
+    '<p style="margin-top:0">Sarah\u2019s ST-segment depression and T-wave inversion are in leads <b>V4\u2013V6</b>. Select the wall or walls of the left ventricle that these leads view.</p>'+
+    '<p class="note">Selected: <span class="sel-list">none</span></p><div class="actions"><button class="btn" data-check>Check answer</button></div><div class="feedback" hidden></div></div></div>';
+  const paint=()=>{$$('.wall',cont).forEach(p=>{const on=sel.has(p.dataset.wall);p.classList.toggle('sel',on);$('[data-l="'+p.dataset.wall+'"]',cont).classList.toggle('inv',on);});
+    $('.sel-list',cont).textContent=sel.size?WALLS.filter(w=>sel.has(w.id)).map(w=>w.name).join(', '):'none';};
+  const tog=p=>{if(locked)return;const id=p.dataset.wall;sel.has(id)?sel.delete(id):sel.add(id);paint();};
+  $$('.wall',cont).forEach(p=>{p.addEventListener('click',()=>tog(p));p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tog(p);}});});
+  $('[data-check]',cont).addEventListener('click',()=>{
+    if(!sel.size){feedback(cont,null,'','Select at least one wall first.');return;}
+    locked=true; const right=[...sel].filter(w=>ANS.includes(w)).length, wrong=sel.size-right, earned=Math.max(0,right-wrong);
+    setScore('territory',earned,2); $('[data-check]',cont).disabled=true;
+    const tl=[];WALLS.forEach(w=>{if(sel.has(w.id))tl.push({ok:ANS.includes(w.id),text:'Selected: '+w.name+' wall',fix:ANS.includes(w.id)?null:'Leads V4\u2013V6 do not view the '+w.name.toLowerCase()+' wall ('+w.leads+').'});
+      else if(ANS.includes(w.id))tl.push({ok:false,text:'Not selected: '+w.name+' wall',fix:'Leads V4\u2013V6 view this wall ('+w.leads+').'});});
+    record('territory','Sarah\u2019s changes are in leads V4\u2013V6. Select the wall or walls of the left ventricle these leads view.',tl);
+    $$('.wall',cont).forEach(p=>{const id=p.dataset.wall;p.classList.remove('sel');const lbl=$('[data-l="'+id+'"]',cont),ll=$('[data-ll="'+id+'"]',cont);
+      ll.textContent=WALLS.find(w=>w.id===id).leads;
+      if(ANS.includes(id)){p.classList.add(sel.has(id)?'good':'missed');if(sel.has(id)){lbl.classList.add('inv');ll.classList.add('inv');}else{lbl.classList.remove('inv');}}
+      else if(sel.has(id)){p.classList.add('badsel');lbl.classList.add('inv');ll.classList.add('inv');} else lbl.classList.remove('inv');});
+    feedback(cont,right===2&&wrong===0,right===2&&wrong===0?'Correct.':'Not quite.','V3\u2013V4 view the anterior wall and V5\u2013V6 (with I and aVL) view the lateral wall, so changes in V4\u2013V6 are described as <b>anterolateral</b>. These regions are typically supplied by the left anterior descending and left circumflex arteries. One caution: unlike ST elevation, ST depression does not reliably pinpoint the specific blocked artery, but knowing which leads view which walls is the foundation of ECG interpretation.');
+  });
+}
+
+/* Sort causes */
+const SORT=[
+  {t:'Myocardial ischemia from coronary artery disease',a:'st'},
+  {t:'Left ventricular strain from long-standing hypertension',a:'st'},
+  {t:'Digoxin effect',a:'st'},
+  {t:'Hypokalemia (low potassium)',a:'both'},
+  {t:'Hypomagnesemia (low magnesium)',a:'qt'},
+  {t:'Hypocalcemia (low calcium)',a:'qt'},
+  {t:'QT-prolonging medications (for example, some antiarrhythmics, macrolide antibiotics, antipsychotics)',a:'qt'},
+  {t:'Congenital long QT syndrome',a:'qt'}
+];
+const BINS={st:'ST depression / T inversion',qt:'QT prolongation',both:'Both'};
+function renderSort(){
+  const cont=$('#act-sort'); const items=shuffle(SORT.map((o,i)=>({...o,i}))); const ans={}; let locked=false;
+  cont.innerHTML='<div>'+items.map(o=>'<div class="sort-row" data-i="'+o.i+'"><span>'+esc(o.t)+'</span><span class="seg" role="group" aria-label="Category for '+esc(o.t)+'">'+
+    Object.entries(BINS).map(([k,v])=>'<button type="button" data-bin="'+k+'" aria-pressed="false">'+v+'</button>').join('')+'</span></div>').join('')+'</div>'+
+    '<div class="actions"><button class="btn" data-check>Check sort</button></div><div class="feedback" hidden></div>';
+  $$('.sort-row',cont).forEach(r=>r.addEventListener('click',e=>{const b=e.target.closest('[data-bin]');if(!b||locked)return;ans[r.dataset.i]=b.dataset.bin;$$('[data-bin]',r).forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));}));
+  $('[data-check]',cont).addEventListener('click',()=>{
+    const left=SORT.length-Object.keys(ans).length;
+    if(left){feedback(cont,null,'',left+' item(s) still need a category.');return;}
+    locked=true; let earned=0;
+    $$('.sort-row',cont).forEach(r=>{const i=+r.dataset.i,ok=ans[i]===SORT[i].a;if(ok)earned++;r.classList.add(ok?'r-ok':'r-bad');$$('[data-bin]',r).forEach(x=>x.disabled=true);
+      if(!ok)r.insertAdjacentHTML('beforeend','<span class="ans">Correct category: '+BINS[SORT[i].a]+'</span>');});
+    setScore('sort',earned,SORT.length); $('[data-check]',cont).disabled=true;
+    record('sort','For each possible cause, choose which of Sarah\u2019s findings it is most characteristically associated with.',SORT.map((o,i)=>({ok:ans[i]===o.a,text:o.t+'. Your choice: '+BINS[ans[i]],fix:ans[i]===o.a?null:'Correct category: '+BINS[o.a]})));
+    feedback(cont,earned===SORT.length,earned+' of '+SORT.length+' sorted correctly.','In Sarah\u2019s case, exertional chest pain plus hypertension and family history make ischemia, with possible strain from hypertension, the leading explanations for the ST and T-wave changes. Her mildly prolonged QT warrants a medication review and an electrolyte check. Hypokalemia can produce ST depression, T-wave flattening, and an apparently longer QT, which is why it belongs in both columns. Some causes overlap clinically; this sort reflects their most characteristic associations.');
+  });
+}
+
+/* Match tests */
+const TESTS=[
+  {t:'Cardiac troponin (blood test)',a:'Is there active heart-muscle injury, such as an acute coronary syndrome?'},
+  {t:'Echocardiogram',a:'Is there structural disease, such as wall-motion abnormalities, left ventricular hypertrophy, or reduced ejection fraction?'},
+  {t:'Stress test (exercise or pharmacologic, often with imaging)',a:'Does increased cardiac demand provoke ischemia?'},
+  {t:'Coronary angiography',a:'Where are coronary blockages, how severe are they, and is revascularization needed?'},
+  {t:'Electrolyte panel (potassium, magnesium, calcium)',a:'Is there a reversible cause of the prolonged QT interval?'}
+];
+function renderTests(){
+  const cont=$('#act-tests'); const rows=shuffle(TESTS.map((o,i)=>({...o,i}))); const opts=shuffle(TESTS.map((o,i)=>({a:o.a,i})));
+  cont.innerHTML='<div>'+rows.map(o=>'<div class="match-row" data-i="'+o.i+'"><label for="m'+o.i+'"><b>'+esc(o.t)+'</b></label><select id="m'+o.i+'"><option value="">Choose the question it answers\u2026</option>'+
+    opts.map(x=>'<option value="'+x.i+'">'+esc(x.a)+'</option>').join('')+'</select></div>').join('')+'</div><div class="actions"><button class="btn" data-check>Check matches</button></div><div class="feedback" hidden></div>';
+  $('[data-check]',cont).addEventListener('click',()=>{
+    const sels=$$('select',cont); const left=sels.filter(s=>s.value==='').length;
+    if(left){feedback(cont,null,'',left+' test(s) still need a match.');return;}
+    let earned=0;
+    $$('.match-row',cont).forEach(r=>{const i=+r.dataset.i,s=$('select',r),ok=+s.value===i;if(ok)earned++;r.classList.add(ok?'r-ok':'r-bad');s.disabled=true;
+      if(!ok)r.insertAdjacentHTML('beforeend','<span class="ans">Best match: '+esc(TESTS[i].a)+'</span>');});
+    setScore('tests',earned,TESTS.length); $('[data-check]',cont).disabled=true;
+    const chosen={};$$('.match-row',cont).forEach(r=>chosen[r.dataset.i]=+$('select',r).value);
+    record('tests','Match each test to the clinical question it is best suited to answer for Sarah.',TESTS.map((o,i)=>({ok:chosen[i]===i,text:o.t+'. Your match: '+TESTS[chosen[i]].a,fix:chosen[i]===i?null:'Best match: '+o.a})));
+    feedback(cont,earned===TESTS.length,earned+' of '+TESTS.length+' matched correctly.','New or worsening exertional chest pain with ST and T-wave changes calls for ruling out an acute coronary syndrome first. Imaging and functional tests then define structure and ischemia, and angiography maps the coronary anatomy when results or symptoms warrant it. Use this thinking in your answer to Question 4.');
+  });
+}
+
+/* ---------------- Written responses ---------------- */
+function renderWritten(){
+  $$('.response[data-w]').forEach(box=>{
+    const id=box.dataset.w, w=WRITTEN[id];
+    box.innerHTML='<p class="kind">Written response, required</p><h3>'+esc(w.title)+'</h3><p class="prompt"><label for="ta-'+id+'">'+esc(w.prompt)+'</label></p>'+
+      '<textarea id="ta-'+id+'" placeholder="Write your response here\u2026"></textarea><div class="wc"></div>';
+    const ta=$('textarea',box), wc=$('.wc',box);
+    ta.value=state.written[id]||'';
+    const upd=()=>{state.written[id]=ta.value;const n=words(ta.value);wc.textContent=n+' / '+MIN_WORDS+' words minimum'+(n>=MIN_WORDS?' \u2713':'');wc.classList.toggle('met',n>=MIN_WORDS);updateNav();};
+    ta.addEventListener('input',upd); upd();
+  });
+}
+
+/* ---------------- Navigation ---------------- */
+function missingFor(p){
+  if(p===0)return state.name.trim()?[]:['your name'];
+  const r=REQ[p]; if(!r)return [];
+  const m=[];
+  r.items.forEach(i=>{if(!state.scores[i])m.push(ITEM_LABELS[i]);});
+  const short=r.written.filter(w=>words(state.written[w])<MIN_WORDS).length;
+  if(short)m.push(short+' written response'+(short>1?'s':''));
+  return m;
+}
+function renderStepper(){
+  $('#stepper').innerHTML=PAGES.map((n,i)=>{
+    const cls=i===state.page?'current':(i<state.maxUnlocked||(i<=state.maxUnlocked&&missingFor(i).length===0&&i!==6&&i<state.page))?'done':'';
+    return '<li><button type="button" class="'+cls+'" data-go="'+i+'" '+(i>state.maxUnlocked?'disabled':'')+' '+(i===state.page?'aria-current="step"':'')+'><span class="n">'+(i===0?'i':i===6?'\u2713':i)+'</span>'+n+'</button></li>';}).join('');
+}
+function updateNav(){
+  const p=state.page, miss=missingFor(p), back=$('#backBtn'), next=$('#nextBtn'), st=$('#navStatus');
+  back.style.visibility=p===0?'hidden':'visible';
+  if(p===6){next.style.visibility='hidden';st.textContent='Case complete. Download your report.';st.className='status ready';}
+  else{
+    next.style.visibility='visible';
+    next.textContent=p===0?'Begin the case':p===5?'Finish the case':'Continue to '+PAGES[p+1].toLowerCase();
+    next.disabled=miss.length>0;
+    st.className='status'+(miss.length?'':' ready');
+    st.textContent=miss.length?'To continue, complete: '+miss.join(', ')+'.':'Section complete.';
+  }
+  renderStepper();
+}
+function goTo(p){
+  state.page=p; state.maxUnlocked=Math.max(state.maxUnlocked,p);
+  $$('.page').forEach(s=>s.classList.toggle('active',+s.dataset.page===p));
+  if(p===6)$('#fileNamePreview').textContent=pdfName();
+  updateNav(); window.scrollTo({top:0,behavior:'auto'});
+  const h=$('.page.active h2'); if(h){h.setAttribute('tabindex','-1');h.focus({preventScroll:true});}
+}
+$('#nextBtn').addEventListener('click',()=>{if(!missingFor(state.page).length)goTo(state.page+1);});
+$('#backBtn').addEventListener('click',()=>{if(state.page>0)goTo(state.page-1);});
+$('#stepper').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b&&!b.disabled)goTo(+b.dataset.go);});
+$('#studentName').addEventListener('input',e=>{state.name=e.target.value;updateNav();});
+
+/* ---------------- Report ---------------- */
+function pdfName(){return 'ECG_Case_Study_'+(state.name.trim().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'')||'Student')+'.pdf';}
+window.addEventListener('beforeunload',e=>{if(state.page>0&&state.page<6){e.preventDefault();e.returnValue='';}});
+
+/* PDF */
+function pdfSafe(s){
+  return String(s||'').replace(/\u2192/g,'->').replace(/\u2713/g,'').replace(/[\u2264]/g,'<=').replace(/[\u2265]/g,'>=')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF\u2018\u2019\u201C\u201D\u2013\u2014\u2022\u2026]/g,'?');
+}
+function buildPdf(){
+  if(!window.jspdf){$('#pdfMsg').textContent='The PDF tool didn\u2019t load. Check your internet connection and reload the page; your work stays on this page until you close it.';return;}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'letter'});
+  const M=54, PW=612, PH=792, CW=PW-2*M; let y=M;
+  const BLUE=[0,82,204], INK=[11,35,80], MUTED=[79,96,133], OK=[15,122,61], BAD=[180,35,24];
+  const ensure=h=>{if(y+h>PH-M){doc.addPage();y=M;}};
+  const para=(txt,{size=10.5,style='normal',color=INK,gap=6,lh=1.4,indent=0}={})=>{
+    doc.setFont('helvetica',style);doc.setFontSize(size);doc.setTextColor(...color);
+    const lines=doc.splitTextToSize(pdfSafe(txt),CW-indent);
+    lines.forEach(l=>{ensure(size*lh);doc.text(l,M+indent,y+size);y+=size*lh;});y+=gap;
+  };
+  const mark=(ok,text,fix)=>{
+    doc.setFont('helvetica','bold');doc.setFontSize(9.5);const tw=doc.getTextWidth('Incorrect')+12, ind=10;
+    doc.setFont('helvetica','normal');doc.setFontSize(10.5);
+    const lines=doc.splitTextToSize(pdfSafe(text),CW-ind-tw);
+    doc.setFont('helvetica','italic');doc.setFontSize(10);
+    const fl=fix?doc.splitTextToSize(pdfSafe(fix),CW-ind-tw):[];
+    ensure(Math.min(lines.length*14.7+fl.length*14,60));
+    doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(...(ok?OK:BAD));doc.text(ok?'Correct':'Incorrect',M+ind,y+10.5);
+    doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(...INK);
+    lines.forEach(l=>{ensure(14.7);doc.text(l,M+ind+tw,y+10.5);y+=14.7;});
+    doc.setFont('helvetica','italic');doc.setFontSize(10);doc.setTextColor(...MUTED);
+    fl.forEach(l=>{ensure(14);doc.text(l,M+ind+tw,y+10);y+=14;});
+    y+=5;
+  };
+  try{const img=$('.topbar img');doc.addImage(img.src,'JPEG',M,y,54,51);}catch(e){}
+  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(...INK);doc.text('Case Study Report: Electrocardiography',M+68,y+20);
+  doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(...MUTED);
+  doc.text(pdfSafe('Student: '+state.name.trim()),M+68,y+37);
+  doc.text(pdfSafe('Date: '+new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})),M+68,y+51);
+  y+=64; doc.setDrawColor(...BLUE);doc.setLineWidth(2.5);doc.line(M,y,PW-M,y); y+=18;
+
+  for(let s=1;s<=5;s++){
+    ensure(70);
+    doc.setFillColor(238,243,252);doc.rect(M,y,CW,24,'F');doc.setFillColor(...BLUE);doc.rect(M,y,4,24,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(12.5);doc.setTextColor(...BLUE);doc.text(pdfSafe(SECTION_TITLES[s]),M+12,y+16);y+=36;
+    REQ[s].items.forEach(i=>{
+      const r=state.results[i]; if(!r)return;
+      ensure(50);
+      para(ITEM_LABELS[i],{size:11,style:'bold',color:BLUE,gap:2});
+      para(r.prompt,{size:10,style:'italic',color:MUTED,gap:5});
+      r.lines.forEach(l=>mark(l.ok,l.text,l.fix));
+      y+=8;
+    });
+    REQ[s].written.forEach(w=>{
+      ensure(50);
+      para('Written response',{size:11,style:'bold',color:BLUE,gap:2});
+      para(WRITTEN[w].prompt,{size:10.5,style:'bold',gap:4});
+      (state.written[w]||'').split(/\n+/).filter(x=>x.trim()).forEach(pg=>para(pg,{size:10.5,gap:5}));
+      y+=8;
+    });
+    y+=6;
+  }
+
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(...MUTED);
+    doc.text(pdfSafe('Florida Education Institute  |  ECG Case Study: Sarah Mitchell  |  '+state.name.trim()),M,PH-28);
+    doc.text('Page '+i+' of '+n,PW-M,PH-28,{align:'right'});}
+  const fname=pdfName();
+  doc.save(fname);
+  $('#pdfMsg').textContent='Downloaded '+fname+'.';
+}
+$('#dlPdf').addEventListener('click',buildPdf);
+
+/* Start over */
+$('#retake').addEventListener('click',()=>{
+  if(!confirm('Start over? The activities will reset with shuffled questions. Your written responses will be kept so you can revise them.'))return;
+  state.scores={}; state.results={}; state.maxUnlocked=1;
+  $('#pdfMsg').textContent='Your work is not saved when you close this page, so download your report first.';
+  renderActivities(); goTo(1);
+});
+
+/* ---------------- Init ---------------- */
+function renderActivities(){
+  renderRisk(); ['p2q1','p2q2','p3q1','p3q2','qt','stressq'].forEach(renderMCQ);
+  renderElectrodes(); draw12(); renderTrace(); renderLeads(); renderTerritory(); renderSort(); renderTests();
+}
+renderActivities(); renderWritten(); goTo(0);
+})();
+</script>
+</body>
+</html>
